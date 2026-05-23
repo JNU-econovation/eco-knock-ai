@@ -110,17 +110,3 @@ def chunk_markdown_text(
             chunk_id += 1
 
     return chunks
-
-
-def chunk_text( 
-    text: str,
-    source: str,
-    min_length: int = 20,
-    max_length: int = 500
-) -> List[Dict]:
-    return chunk_markdown_text(
-        text=text,
-        source=source,
-        min_length=min_length,
-        max_length=max_length,
-    )

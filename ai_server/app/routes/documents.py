@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from app.models.schemas import IndexRequest, IndexResponse
 from app.services.loader import load_document
-from app.services.chunker import chunk_text
+from app.services.chunker import chunk_markdown_text
 from app.services.retriever import retriever
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -14,7 +14,7 @@ def index_document(request: IndexRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"failed to load document: {str(e)}")
 
-    chunks = chunk_text(text=text, source=request.file_path)
+    chunks = chunk_markdown_text(text=text, source=request.file_path)
 
     if not chunks:
         raise HTTPException(status_code=400, detail="no valid chunks created from document")
