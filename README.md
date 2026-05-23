@@ -13,7 +13,8 @@
 - aliases.json 기반 키워드 보너스 점수 보정 (검색 결과 재점수화 시 약어 그룹 매칭)
 - Gemini 2.5 Flash LLM 연결 (약어 풀어쓰기 포함 쿼리 재작성)
 - RAG 파이프라인 (`needs_retrieval` → `rewrite_query` → `search` → `generate_answer`)
-- `/chat`, `/retrieve`, `/documents/index` API 엔드포인트
+- `/chat`, `/retrieve`, `/documents/index-all` API 엔드포인트
+- 에코노베이션 블로그 크롤러 (`crawler.py`) — 카테고리별 마크다운 저장
 
 ## 아직 미완성인 부분
 
@@ -29,6 +30,7 @@
 - ChromaDB
 - sentence-transformers (`paraphrase-multilingual-MiniLM-L12-v2`)
 - Pydantic
+- requests + BeautifulSoup4 (블로그 크롤러)
 
 ## 프로젝트 구조
 
@@ -37,23 +39,29 @@ KEYRING/
 ├── .env                        # GOOGLE_API_KEY 보관 (깃 제외)
 ├── .gitignore
 ├── ai_server/
-│   ├── main.py                 # FastAPI 앱 진입점, 라우터 등록
+│   ├── data/                   # 원본 문서
+│   │   ├── econovation_rules.md
+│   │   ├── activities.md
+│   │   ├── club_intro.md
+│   │   ├── blog_dev.md         # 크롤링 결과 (SUMMER/WINTER_DEV)
+│   │   ├── blog_news.md        # 크롤링 결과 (ECONO_NEWS)
+│   │   └── blog_etc.md         # 크롤링 결과 (기타)
+│   ├── requirements.txt
 │   └── app/
+│       ├── main.py             # FastAPI 앱 진입점, 라우터 등록
 │       ├── core/
 │       │   └── aliases.json    # 약어 매핑
 │       ├── models/
 │       │   └── schemas.py      # Pydantic 요청/응답 스키마
 │       ├── routes/
 │       │   ├── chat.py         # /chat, /retrieve 엔드포인트
-│       │   └── documents.py    # 문서 인덱싱 엔드포인트
+│       │   └── documents.py    # /documents/index-all 엔드포인트
 │       └── services/
 │           ├── chunker.py      # 마크다운 청킹 로직
+│           ├── crawler.py      # 에코노베이션 블로그 크롤러
 │           ├── loader.py       # 파일 로딩
 │           ├── llm.py          # Gemini 연결, RAG 함수들
 │           └── retriever.py    # 하이브리드 검색
-├── data/
-│   ├── raw/                    # 원본 문서
-│   └── processed/              # 전처리 결과
 └── vectorstore/
     └── chroma/                 # ChromaDB 영속화 데이터
 ```
@@ -97,7 +105,7 @@ pip install -r requirements.txt
 
 ```bash
 cd ai_server
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 
 API 문서: `http://localhost:8000/docs`
@@ -121,21 +129,38 @@ ChatResponse(answer, sources, used_retrieval)
 ## 문서 인덱싱
 
 챗봇 사용 전 반드시 먼저 실행해야 합니다.
-현재 인덱싱된 문서: `data/raw/econovation_rules.md` (동아리 회칙)
+
+> **블로그 데이터 안내**: `data/blog_*.md` 파일은 git에 포함되지 않습니다. 인덱싱 전에 크롤러를 먼저 실행해 생성해야 합니다.
+>
+> ```bash
+> cd ai_server
+> python app/services/crawler.py
+> ```
 
 ```http
-POST /documents/index
+POST /documents/index-all
 Content-Type: application/json
 
 {
-  "file_path": "data/raw/econovation_rules.md"
+  "file_paths": [
+    "data/econovation_rules.md",
+    "data/activities.md",
+    "data/club_intro.md",
+    "data/blog_dev.md",
+    "data/blog_news.md",
+    "data/blog_etc.md"
+  ]
 }
 ```
 
 ```json
 {
-  "message": "indexed successfully",
-  "chunks": 42
+  "total_files": 4,
+  "total_chunks": 120,
+  "results": [
+    { "file_path": "data/econovation_rules.md", "chunks": 42, "error": null },
+    { "file_path": "data/blog_dev.md", "chunks": 37, "error": null }
+  ]
 }
 ```
 
@@ -153,7 +178,7 @@ Content-Type: application/json
 ```json
 {
   "answer": "AM(Active Member)이 되기 위해서는 ...",
-  "sources": ["data/raw/econovation_rules.md"],
+  "sources": ["data/econovation_rules.md"],
   "used_retrieval": true
 }
 ```
@@ -183,7 +208,7 @@ Content-Type: application/json
       "title": "에코노베이션 동아리 회칙 > 제5조 회원의 분류 > 1. AM (Active Member)",
       "score": 0.87,
       "text": "AM은 ...",
-      "source": "data/raw/econovation_rules.md"
+      "source": "data/econovation_rules.md"
     }
   ]
 }
@@ -193,4 +218,4 @@ Content-Type: application/json
 
 ## 현재 상태 요약
 
-이 저장소는 에코노베이션 동아리 앱의 AI 챗봇 백엔드를 구현한 것입니다. 문서 인덱싱, 하이브리드 검색, Gemini 기반 RAG 파이프라인, API 엔드포인트는 구현되어 있습니다. 실제 쿼리 정확도 검증 및 프론트엔드 연동은 아직 진행 중입니다.
+이 저장소는 에코노베이션 동아리 앱의 AI 챗봇 백엔드를 구현한 것입니다. 문서 인덱싱, 하이브리드 검색, Gemini 기반 RAG 파이프라인, API 엔드포인트는 구현되어 있습니다. 나머지 부분은 아직 진행 중입니다.
