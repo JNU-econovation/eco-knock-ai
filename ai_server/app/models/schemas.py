@@ -2,13 +2,20 @@ from pydantic import BaseModel
 from typing import List
 
 
-class IndexRequest(BaseModel):
+class IndexAllRequest(BaseModel):
+    file_paths: list[str]
+
+
+class IndexAllResult(BaseModel):
     file_path: str
-
-
-class IndexResponse(BaseModel):
-    message: str
     chunks: int
+    error: str | None = None
+
+
+class IndexAllResponse(BaseModel):
+    total_files: int
+    total_chunks: int
+    results: list[IndexAllResult]
 
 
 class RetrieveRequest(BaseModel):
