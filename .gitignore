@@ -3,4 +3,5 @@
 __pycache__/
 *.pyc
 vectorstore/
+ai_server/data/blog_*.md
 CLAUDE.md
