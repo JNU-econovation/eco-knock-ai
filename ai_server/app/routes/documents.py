@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException
-from app.models.schemas import IndexRequest, IndexResponse
+from fastapi import APIRouter
+from app.models.schemas import IndexAllRequest, IndexAllResponse, IndexAllResult
 from app.services.loader import load_document
 from app.services.chunker import chunk_markdown_text
 from app.services.retriever import retriever
@@ -7,24 +7,23 @@ from app.services.retriever import retriever
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-@router.post("/index", response_model=IndexResponse)
-def index_document(request: IndexRequest):
-    try:
-        text = load_document(request.file_path)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"failed to load document: {str(e)}")
+@router.post("/index-all", response_model=IndexAllResponse)
+def index_all_documents(request: IndexAllRequest):
+    results = []
+    total_chunks = 0
 
-    chunks = chunk_markdown_text(text=text, source=request.file_path)
+    for file_path in request.file_paths:
+        try:
+            text = load_document(file_path)
+            chunks = chunk_markdown_text(text=text, source=file_path)
+            chunk_count = retriever.build_index(chunks, source=file_path)
+            results.append(IndexAllResult(file_path=file_path, chunks=chunk_count))
+            total_chunks += chunk_count
+        except Exception as e:
+            results.append(IndexAllResult(file_path=file_path, chunks=0, error=str(e)))
 
-    if not chunks:
-        raise HTTPException(status_code=400, detail="no valid chunks created from document")
-
-    try:
-        chunk_count = retriever.build_index(chunks, source=request.file_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"failed to build vector index: {str(e)}")
-
-    return {
-        "message": "indexed successfully",
-        "chunks": chunk_count,
-    }
+    return IndexAllResponse(
+        total_files=len(request.file_paths),
+        total_chunks=total_chunks,
+        results=results,
+    )
