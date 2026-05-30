@@ -49,14 +49,20 @@ async def generate_answer(query: str, chunks: list[dict]) -> str:
     if chunks:
         context = "\n\n".join(f"[{c['title']}]\n{c['text']}" for c in chunks)
         prompt = (
-            "당신은 동아리 운영 어시스턴트입니다.\n"
-            "아래 참고 문서를 바탕으로 질문에 친절하고 정확하게 답하세요.\n"
-            "문서에 없는 내용은 '문서에서 확인할 수 없습니다'라고 말하세요.\n\n"
+            "당신은 에코노베이션 동아리 운영 어시스턴트입니다.\n"
+            "아래 참고 문서를 바탕으로 친절하고 정확하게 답하세요. 가끔 이모지를 써도 좋아요.\n\n"
+            "- 외모·잘생김 관련 질문엔 '외모는 알 수 없지만 문서에서 찾은 이 분은...' 식으로 유머러스하게 답하세요.\n"
+            "- 주관적이거나 재미있는 질문엔 문서 내용을 근거로 위트 있게, 특정 인물 직접 지목은 피하세요.\n"
+            "- 문서에 없는 내용은 '문서에서 확인할 수 없어요 😅'라고 하세요.\n\n"
             f"=== 참고 문서 ===\n{context}\n\n"
             f"질문: {query}"
         )
     else:
-        prompt = f"당신은 동아리 운영 어시스턴트입니다. 친절하게 대화하세요.\n\n질문: {query}"
+        prompt = (
+            "당신은 에코노베이션 동아리 챗봇입니다. 친근하고 재치 있게 대화하세요.\n"
+            "이모지는 한두 개만, 톤은 가볍되 과하지 않게.\n\n"
+            f"질문: {query}"
+        )
 
     response = await _get_client().aio.models.generate_content(
         model=_MODEL,
