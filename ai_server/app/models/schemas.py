@@ -36,10 +36,6 @@ class RetrieveResponse(BaseModel):
     results: List[RetrieveResult]
 
 
-class ChatRequest(BaseModel):
-    question: str
-
-
 class ChatResponse(BaseModel):
     answer: str
     sources: List[str]

@@ -1,6 +1,8 @@
 import os
 from functools import lru_cache
+from typing import Optional
 from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -45,7 +47,11 @@ async def rewrite_query(query: str) -> str:
     return response.text.strip()
 
 
-async def generate_answer(query: str, chunks: list[dict]) -> str:
+async def generate_answer(
+    query: str,
+    chunks: list[dict],
+    file_data: Optional[tuple[bytes, str]] = None,
+) -> str:
     if chunks:
         context = "\n\n".join(f"[{c['title']}]\n{c['text']}" for c in chunks)
         prompt = (
@@ -64,8 +70,17 @@ async def generate_answer(query: str, chunks: list[dict]) -> str:
             f"질문: {query}"
         )
 
+    if file_data:
+        file_bytes, mime_type = file_data
+        contents = [
+            types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
+            types.Part.from_text(text=prompt),
+        ]
+    else:
+        contents = prompt
+
     response = await _get_client().aio.models.generate_content(
         model=_MODEL,
-        contents=prompt,
+        contents=contents,
     )
     return response.text.strip()
