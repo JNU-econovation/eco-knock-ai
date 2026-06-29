@@ -1,5 +1,6 @@
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Optional
 from google import genai
 from google.genai import types
@@ -8,6 +9,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _MODEL = "gemini-2.5-flash"
+_PROMPTS_DIR = Path(__file__).parent.parent / "core" / "prompts"
+
+
+@lru_cache(maxsize=None)
+def _load_prompt(filename: str) -> str:
+    return (_PROMPTS_DIR / filename).read_text(encoding="utf-8")
 
 
 @lru_cache(maxsize=1)
@@ -54,21 +61,9 @@ async def generate_answer(
 ) -> str:
     if chunks:
         context = "\n\n".join(f"[{c['title']}]\n{c['text']}" for c in chunks)
-        prompt = (
-            "당신은 에코노베이션 동아리 운영 어시스턴트입니다.\n"
-            "아래 참고 문서를 바탕으로 친절하고 정확하게 답하세요. 가끔 이모지를 써도 좋아요.\n\n"
-            "- 외모·잘생김 관련 질문엔 '외모는 알 수 없지만 문서에서 찾은 이 분은...' 식으로 유머러스하게 답하세요.\n"
-            "- 주관적이거나 재미있는 질문엔 문서 내용을 근거로 위트 있게, 특정 인물 직접 지목은 피하세요.\n"
-            "- 문서에 없는 내용은 '문서에서 확인할 수 없어요 😅'라고 하세요.\n\n"
-            f"=== 참고 문서 ===\n{context}\n\n"
-            f"질문: {query}"
-        )
+        prompt = _load_prompt("with_context.md").format(context=context, query=query)
     else:
-        prompt = (
-            "당신은 에코노베이션 동아리 챗봇입니다. 친근하고 재치 있게 대화하세요.\n"
-            "이모지는 한두 개만, 톤은 가볍되 과하지 않게.\n\n"
-            f"질문: {query}"
-        )
+        prompt = _load_prompt("no_context.md").format(query=query)
 
     if file_data:
         file_bytes, mime_type = file_data

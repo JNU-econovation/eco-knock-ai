@@ -7,12 +7,15 @@
 ## 현재 구현 범위
 
 - FastAPI 기반 비동기 REST API 서버
+- CORS 미들웨어 (`ALLOWED_ORIGINS` 환경변수로 허용 도메인 제어)
 - 마크다운 문서 로딩 및 헤더 기준 청킹
 - ChromaDB 로컬 영속화 벡터 인덱스 구축
 - 하이브리드 검색 (벡터 유사도 + 키워드 보너스 점수)
 - aliases.json 기반 키워드 보너스 점수 보정 (검색 결과 재점수화 시 약어 그룹 매칭)
 - Gemini 2.5 Flash LLM 연결 (약어 풀어쓰기 포함 쿼리 재작성)
 - RAG 파이프라인 (`needs_retrieval` → `rewrite_query` → `search` → `generate_answer`)
+- 프롬프트 외부 파일 관리 (`core/prompts/with_context.md`, `no_context.md`)
+- `/chat` 이미지·PDF 파일 첨부 지원 (jpg, png, webp, gif, pdf)
 - `/chat`, `/retrieve`, `/documents/index-all` API 엔드포인트
 - 에코노베이션 블로그 크롤러 (`crawler.py`) — 카테고리별 마크다운 저장
 
@@ -43,14 +46,18 @@ KEYRING/
 │   │   ├── econovation_rules.md
 │   │   ├── activities.md
 │   │   ├── club_intro.md
+│   │   ├── members.md          # 회원 정보
 │   │   ├── blog_dev.md         # 크롤링 결과 (SUMMER/WINTER_DEV)
 │   │   ├── blog_news.md        # 크롤링 결과 (ECONO_NEWS)
 │   │   └── blog_etc.md         # 크롤링 결과 (기타)
 │   ├── requirements.txt
 │   └── app/
-│       ├── main.py             # FastAPI 앱 진입점, 라우터 등록
+│       ├── main.py             # FastAPI 앱 진입점, CORS, 라우터 등록
 │       ├── core/
-│       │   └── aliases.json    # 약어 매핑
+│       │   ├── aliases.json    # 약어 매핑
+│       │   └── prompts/
+│       │       ├── with_context.md   # 문서 검색 결과 포함 프롬프트
+│       │       └── no_context.md     # 일반 대화 프롬프트
 │       ├── models/
 │       │   └── schemas.py      # Pydantic 요청/응답 스키마
 │       ├── routes/
@@ -87,10 +94,17 @@ KEYRING/
   - Gemini API 인증 키입니다.
   - [Google AI Studio](https://aistudio.google.com)에서 발급받을 수 있습니다.
 
+선택:
+
+- `ALLOWED_ORIGINS`
+  - CORS 허용 도메인입니다. 기본값은 `*`(전체 허용)입니다.
+  - 여러 도메인은 쉼표로 구분합니다. 예: `https://app.example.com,https://admin.example.com`
+
 예시:
 
 ```dotenv
 GOOGLE_API_KEY=your_gemini_api_key_here
+ALLOWED_ORIGINS=https://app.example.com
 ```
 
 ## 실행 방법
@@ -166,13 +180,16 @@ Content-Type: application/json
 
 ## 챗봇 질의응답
 
+`/chat`은 `multipart/form-data` 형식으로 요청합니다. `question` 필드는 필수이며, `file` 필드로 이미지나 PDF를 선택적으로 첨부할 수 있습니다.
+
+지원 파일 형식: `jpg`, `jpeg`, `png`, `webp`, `gif`, `pdf`
+
 ```http
 POST /chat
-Content-Type: application/json
+Content-Type: multipart/form-data
 
-{
-  "question": "AM이 되려면 어떤 조건을 갖춰야 하나요?"
-}
+question=AM이 되려면 어떤 조건을 갖춰야 하나요?
+file=(선택) 이미지 또는 PDF 파일
 ```
 
 ```json
