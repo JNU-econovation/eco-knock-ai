@@ -1,20 +1,37 @@
+import asyncio
 import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError
 from dotenv import load_dotenv
 
 load_dotenv()
 
-_MODEL = "gemini-2.5-flash"
+_MODEL = "gemini-1.5-flash"
 _PROMPTS_DIR = Path(__file__).parent.parent / "core" / "prompts"
 
 
 @lru_cache(maxsize=None)
 def _load_prompt(filename: str) -> str:
     return (_PROMPTS_DIR / filename).read_text(encoding="utf-8")
+
+
+async def _generate_with_retry(client, model, contents, config, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return await client.aio.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config,
+            )
+        except ServerError as e:
+            if "503" in str(e) and attempt < max_retries - 1:
+                await asyncio.sleep(1)
+                continue
+            raise
 
 
 @lru_cache(maxsize=1)
@@ -33,10 +50,8 @@ async def needs_retrieval(query: str) -> bool:
         "반드시 YES 또는 NO만 답해.\n\n"
         f"질문: {query}"
     )
-    response = await _get_client().aio.models.generate_content(
-        model=_MODEL,
-        contents=prompt,
-    )
+    config = types.GenerateContentConfig(temperature=0.0)
+    response = await _generate_with_retry(_get_client(), _MODEL, prompt, config)
     return response.text.strip().upper().startswith("YES")
 
 
@@ -47,10 +62,8 @@ async def rewrite_query(query: str) -> str:
         "재작성된 쿼리 한 줄만 출력해. 설명 없이.\n\n"
         f"질문: {query}"
     )
-    response = await _get_client().aio.models.generate_content(
-        model=_MODEL,
-        contents=prompt,
-    )
+    config = types.GenerateContentConfig(temperature=0.0)
+    response = await _generate_with_retry(_get_client(), _MODEL, prompt, config)
     return response.text.strip()
 
 
@@ -61,21 +74,27 @@ async def generate_answer(
 ) -> str:
     if chunks:
         context = "\n\n".join(f"[{c['title']}]\n{c['text']}" for c in chunks)
-        prompt = _load_prompt("with_context.md").format(context=context, query=query)
+        user_message = f"=== 참고 문서 ===\n{context}\n\n질문: {query}"
+        config = types.GenerateContentConfig(
+            temperature=0.4,
+            system_instruction=_load_prompt("with_context.md"),
+            max_output_tokens=1000,
+        )
     else:
-        prompt = _load_prompt("no_context.md").format(query=query)
+        user_message = _load_prompt("no_context.md") + f"\n\n질문: {query}"
+        config = types.GenerateContentConfig(
+            temperature=0.9,
+            max_output_tokens=1000,
+        )
 
     if file_data:
         file_bytes, mime_type = file_data
         contents = [
             types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
-            types.Part.from_text(text=prompt),
+            types.Part.from_text(text=user_message),
         ]
     else:
-        contents = prompt
+        contents = user_message
 
-    response = await _get_client().aio.models.generate_content(
-        model=_MODEL,
-        contents=contents,
-    )
+    response = await _generate_with_retry(_get_client(), _MODEL, contents, config)
     return response.text.strip()
