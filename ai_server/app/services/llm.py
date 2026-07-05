@@ -70,6 +70,7 @@ async def rewrite_query(query: str) -> str:
 async def generate_answer(
     query: str,
     chunks: list[dict],
+    is_club_related: bool = False,
     file_data: Optional[tuple[bytes, str]] = None,
 ) -> str:
     if chunks:
@@ -78,6 +79,13 @@ async def generate_answer(
         config = types.GenerateContentConfig(
             temperature=0.4,
             system_instruction=_load_prompt("with_context.md"),
+            max_output_tokens=1000,
+        )
+    elif is_club_related:
+        user_message = query
+        config = types.GenerateContentConfig(
+            temperature=0.4,
+            system_instruction=_load_prompt("unknown_context.md"),
             max_output_tokens=1000,
         )
     else:

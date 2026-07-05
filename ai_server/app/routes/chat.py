@@ -7,6 +7,8 @@ from app.services.llm import needs_retrieval, rewrite_query, generate_answer
 
 router = APIRouter(tags=["chat"])
 
+RELEVANCE_THRESHOLD = 0.4
+
 _ALLOWED_EXTENSIONS = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -58,9 +60,15 @@ async def chat(
     try:
         rewritten = await rewrite_query(question)
         chunks = retriever.search(query=rewritten, top_k=3)
-        answer = await generate_answer(question, chunks, file_data=file_data)
+        relevant_chunks = [c for c in chunks if c["score"] >= RELEVANCE_THRESHOLD]
+        answer = await generate_answer(
+            question,
+            chunks=relevant_chunks,
+            is_club_related=True,
+            file_data=file_data,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    sources = list({c["source"] for c in chunks})
+    sources = list({c["source"] for c in relevant_chunks})
     return {"answer": answer, "sources": sources, "used_retrieval": True}
