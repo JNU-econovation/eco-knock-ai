@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-_MODEL = "gemini-1.5-flash"
+_MODEL = "gemini-3.1-flash-lite"
 _PROMPTS_DIR = Path(__file__).parent.parent / "core" / "prompts"
 
 
