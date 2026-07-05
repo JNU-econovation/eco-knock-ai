@@ -8,16 +8,21 @@
 
 - FastAPI 기반 비동기 REST API 서버
 - CORS 미들웨어 (`ALLOWED_ORIGINS` 환경변수로 허용 도메인 제어)
-- 마크다운 문서 로딩 및 헤더 기준 청킹
+- 마크다운 문서 로딩 및 헤더 기준 청킹 (h1/h2/h3 계층 정확히 추적)
 - ChromaDB 로컬 영속화 벡터 인덱스 구축
-- 하이브리드 검색 (벡터 유사도 + 키워드 보너스 점수)
-- aliases.json 기반 키워드 보너스 점수 보정 (검색 결과 재점수화 시 약어 그룹 매칭)
-- Gemini 2.5 Flash LLM 연결 (약어 풀어쓰기 포함 쿼리 재작성)
-- RAG 파이프라인 (`needs_retrieval` → `rewrite_query` → `search` → `generate_answer`)
-- 프롬프트 외부 파일 관리 (`core/prompts/with_context.md`, `no_context.md`)
+- 하이브리드 검색: 벡터 검색 + Python 직접 키워드 검색 결합 (중복 제거 후 score 정렬)
+- 한국어 조사 제거(`_strip_josa`) 기반 키워드 추출 — 복합 조사("에는", "에서는" 등) 반복 처리
+- aliases.json 기반 약어 보너스 점수 보정
+- Gemini 3.1 Flash Lite LLM 연결 (약어 풀어쓰기 포함 쿼리 재작성)
+- temperature 분리: needs_retrieval/rewrite_query=0.0, with_context=0.4, no_context=0.9
+- 503 에러 자동 재시도 (최대 3회, 1초 간격)
+- RAG 파이프라인 (`needs_retrieval` → `rewrite_query` → 하이브리드 검색 → `generate_answer`)
+- 검색 결과 relevance threshold(0.4) 필터링 — 관련 문서 없을 때 `unknown_context` 분기
+- 프롬프트 외부 파일 관리 (`core/prompts/with_context.md`, `no_context.md`, `unknown_context.md`)
 - `/chat` 이미지·PDF 파일 첨부 지원 (jpg, png, webp, gif, pdf)
 - `/chat`, `/retrieve`, `/documents/index-all` API 엔드포인트
 - 에코노베이션 블로그 크롤러 (`crawler.py`) — 카테고리별 마크다운 저장
+- vectorstore 정리 스크립트 (`cleanup_vectorstore.py`) — 유효하지 않은 source 청크 삭제
 
 ## 아직 미완성인 부분
 
@@ -29,7 +34,7 @@
 
 - Python 3.12
 - FastAPI
-- Gemini 2.5 Flash (`google-genai` SDK)
+- Gemini 3.1 Flash Lite (`google-genai` SDK)
 - ChromaDB
 - sentence-transformers (`paraphrase-multilingual-MiniLM-L12-v2`)
 - Pydantic
@@ -56,8 +61,9 @@ KEYRING/
 │       ├── core/
 │       │   ├── aliases.json    # 약어 매핑
 │       │   └── prompts/
-│       │       ├── with_context.md   # 문서 검색 결과 포함 프롬프트
-│       │       └── no_context.md     # 일반 대화 프롬프트
+│       │       ├── with_context.md     # 문서 검색 결과 포함 프롬프트
+│       │       ├── no_context.md       # 일반 대화 프롬프트
+│       │       └── unknown_context.md  # 동아리 관련이나 문서 없을 때 프롬프트
 │       ├── models/
 │       │   └── schemas.py      # Pydantic 요청/응답 스키마
 │       ├── routes/
@@ -129,13 +135,17 @@ API 문서: `http://localhost:8000/docs`
 ```
 사용자 질문
     ↓
-needs_retrieval()  →  NO → 일반 답변 생성 (문서 검색 없음)
+needs_retrieval()  →  NO → no_context 답변 (temperature=0.9)
     ↓ YES
 rewrite_query()    →  "AM이 뭐야?" → "AM Active Member 활동회원 회원 분류 정의"
     ↓
-retriever.search() →  ChromaDB 벡터 검색 + aliases.json 키워드 보너스
+retriever.search()       →  벡터 검색 (rewritten query, top_k=5)
+retriever.keyword_search() →  키워드 직접 검색 (원본 question, top_k=3)
+    ↓ 중복 제거 후 score 정렬
+relevant_chunks (score >= 0.4 필터링)
     ↓
-generate_answer()  →  참고 문서 포함 Gemini 답변 생성
+relevant_chunks 있음 → with_context 답변 (temperature=0.4)
+relevant_chunks 없음 → unknown_context 답변 (temperature=0.4)
     ↓
 ChatResponse(answer, sources, used_retrieval)
 ```
@@ -162,7 +172,8 @@ Content-Type: application/json
     "data/club_intro.md",
     "data/blog_dev.md",
     "data/blog_news.md",
-    "data/blog_etc.md"
+    "data/blog_etc.md",
+    "data/members.md"
   ]
 }
 ```

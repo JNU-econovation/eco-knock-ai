@@ -37,6 +37,8 @@ def chunk_markdown_text(
     lines = text.splitlines()
 
     sections = []
+    current_h1 = None
+    current_h2 = None
     current_title_parts = []
     current_content = []
 
@@ -61,11 +63,14 @@ def chunk_markdown_text(
             title_text = stripped.lstrip("#").strip()
 
             if level == 1:
+                current_h1 = title_text
+                current_h2 = None
                 current_title_parts = [title_text]
             elif level == 2:
-                current_title_parts = current_title_parts[:1] + [title_text]
+                current_h2 = title_text
+                current_title_parts = [current_h1, title_text] if current_h1 else [title_text]
             elif level >= 3:
-                base = current_title_parts[:2]
+                base = ([current_h1] if current_h1 else []) + ([current_h2] if current_h2 else [])
                 current_title_parts = base + [title_text]
 
         else:
