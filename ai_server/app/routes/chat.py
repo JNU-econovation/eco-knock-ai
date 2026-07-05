@@ -59,8 +59,19 @@ async def chat(
 
     try:
         rewritten = await rewrite_query(question)
-        chunks = retriever.search(query=rewritten, top_k=3)
-        relevant_chunks = [c for c in chunks if c["score"] >= RELEVANCE_THRESHOLD]
+        chunks1 = retriever.search(query=rewritten, top_k=5)
+        chunks2 = retriever.keyword_search(query=question, top_k=3)
+
+        seen = set()
+        merged = []
+        for chunk in chunks1 + chunks2:
+            uid = f"{chunk['source']}::{chunk['chunk_id']}"
+            if uid not in seen:
+                seen.add(uid)
+                merged.append(chunk)
+
+        merged.sort(key=lambda x: x["score"], reverse=True)
+        relevant_chunks = [c for c in merged if c["score"] >= RELEVANCE_THRESHOLD]
         answer = await generate_answer(
             question,
             chunks=relevant_chunks,

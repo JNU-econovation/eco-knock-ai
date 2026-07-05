@@ -64,6 +64,22 @@ class HybridRetriever:
 
         return matched
 
+    _JOSA_SUFFIXES = [
+        "에서", "에게", "한테", "으로서", "로서", "으로", "이랑", "하고",
+        "부터", "까지", "에", "은", "는", "이", "가", "을", "를", "의",
+        "도", "로", "와", "과", "야", "아", "랑", "만",
+    ]
+
+    def _strip_josa(self, token: str) -> str:
+        while True:
+            stripped = token
+            for josa in self._JOSA_SUFFIXES:
+                if token.endswith(josa) and len(token) > len(josa):
+                    token = token[: -len(josa)]
+                    break
+            if token == stripped:
+                return token
+
     def _extract_keywords(self, query: str) -> List[str]:
         tokens = re.findall(r"[A-Za-z]+|[0-9]+|[가-힣]+", query)
 
@@ -77,14 +93,15 @@ class HybridRetriever:
         seen = set()
 
         for token in tokens:
-            lower = token.lower()
+            stripped = self._strip_josa(token)
+            lower = stripped.lower()
             if lower in stopwords:
                 continue
             if len(lower) == 1 and not lower.isupper():
                 continue
             if lower not in seen:
                 seen.add(lower)
-                keywords.append(token)
+                keywords.append(stripped)
 
         return keywords
 
@@ -194,6 +211,40 @@ class HybridRetriever:
         rescored.sort(key=lambda x: x["score"], reverse=True)
 
         return rescored[:top_k]
+
+    def keyword_search(self, query: str, top_k: int = 5) -> List[Dict]:
+        keywords = self._extract_keywords(query)
+        if not keywords:
+            return []
+
+        all_data = self.collection.get(include=["documents", "metadatas"])
+
+        results = []
+        seen = set()
+
+        for keyword in keywords:
+            if len(keyword) < 2:
+                continue
+            keyword_lower = keyword.lower()
+
+            for doc, meta in zip(all_data["documents"], all_data["metadatas"]):
+                if keyword_lower not in doc.lower() and keyword_lower not in meta["title"].lower():
+                    continue
+
+                uid = f"{meta['source']}::{meta['chunk_id']}"
+                if uid in seen:
+                    continue
+                seen.add(uid)
+
+                results.append({
+                    "chunk_id": int(meta["chunk_id"]),
+                    "title": meta["title"],
+                    "score": 0.8,
+                    "text": doc,
+                    "source": meta["source"],
+                })
+
+        return results[:top_k]
 
 
 retriever = HybridRetriever()
