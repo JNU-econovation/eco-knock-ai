@@ -39,3 +39,15 @@ jobs:
             git commit -m "🔧 chore: 블로그 데이터 자동 업데이트"
             git push
           fi
+
+      - name: 배포 서버 재인덱싱
+        run: |
+          curl -X POST "https://eco-knock-ai.isek-ai.org/documents/index-all" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "file_paths": [
+                "data/blog_dev.md",
+                "data/blog_news.md",
+                "data/blog_etc.md"
+              ]
+            }'
