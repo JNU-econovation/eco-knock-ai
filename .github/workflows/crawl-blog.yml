@@ -2,7 +2,7 @@ name: Blog Auto Crawl
 
 on:
   schedule:
-    - cron: "0 15 1 * *"  # 매월 1일 KST 자정 (UTC 15:00)
+    - cron: "0 15 * * *"  # 매일 KST 자정 (UTC 15:00)
   workflow_dispatch:
 
 jobs:
@@ -15,32 +15,60 @@ jobs:
         with:
           token: ${{ secrets.GH_TOKEN }}
 
+      - name: 블로그 레포 최근 커밋 해시 가져오기
+        id: blog_commit
+        run: |
+          LATEST_HASH=$(curl -s \
+            -H "Authorization: token ${{ secrets.GH_TOKEN }}" \
+            "https://api.github.com/repos/JNU-econovation/jnu-econovation.github.io/commits?per_page=1" \
+            | python3 -c "import sys, json; print(json.load(sys.stdin)[0]['sha'])")
+          echo "latest=$LATEST_HASH" >> $GITHUB_OUTPUT
+
+      - name: 이전 해시와 비교
+        id: check_change
+        run: |
+          HASH_FILE=".github/last_blog_commit"
+          if [ -f "$HASH_FILE" ]; then
+            PREV_HASH=$(cat "$HASH_FILE")
+          else
+            PREV_HASH=""
+          fi
+          echo "prev=$PREV_HASH"
+          echo "latest=${{ steps.blog_commit.outputs.latest }}"
+          if [ "$PREV_HASH" = "${{ steps.blog_commit.outputs.latest }}" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up Python 3.12
+        if: steps.check_change.outputs.changed == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install dependencies
+        if: steps.check_change.outputs.changed == 'true'
         run: pip install -r ai_server/requirements.txt
 
       - name: Run crawler
+        if: steps.check_change.outputs.changed == 'true'
         run: python ai_server/app/services/crawler.py
 
-      - name: Commit and push if changed
+      - name: 크롤링 결과 및 새 해시 커밋 & 푸시
+        if: steps.check_change.outputs.changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ai_server/data/blog_*.md
-          if git diff --cached --quiet; then
-            echo "변경된 블로그 데이터 없음"
-          else
-            git commit -m "🔧 chore: 블로그 데이터 자동 업데이트"
-            git push
-          fi
+          echo "${{ steps.blog_commit.outputs.latest }}" > .github/last_blog_commit
+          git add ai_server/data/blog_*.md .github/last_blog_commit
+          git commit -m "🔧 chore: 블로그 데이터 자동 업데이트"
+          git push
 
       - name: 배포 서버 재인덱싱
+        if: steps.check_change.outputs.changed == 'true'
         run: |
           curl -X POST "https://eco-knock-ai.isek-ai.org/documents/index-all" \
             -H "Content-Type: application/json" \
