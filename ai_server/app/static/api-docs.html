@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eco-knock AI – API 명세서</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0d1117;
+    --bg-sidebar: #090d13;
+    --bg-card: #161b22;
+    --bg-code: #0d1117;
+    --border: #21262d;
+    --text: #e6edf3;
+    --text-muted: #7d8590;
+    --text-dim: #484f58;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #f0883e;
+    --purple: #bc8cff;
+    --red: #ff7b72;
+    --method-post: #238636;
+    --method-post-text: #3fb950;
+    --method-get: #1f4e8c;
+    --method-get-text: #58a6ff;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #58a6ff, #bc8cff);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0d1117;
+  }
+
+  .logo-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .logo-version {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 1px 7px;
+    border-radius: 20px;
+  }
+
+  .sidebar-base-url {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: "SF Mono", "Fira Code", monospace;
+    margin-top: 8px;
+    word-break: break-all;
+  }
+
+  .sidebar-nav {
+    padding: 16px 12px;
+    flex: 1;
+  }
+
+  .nav-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 4px 8px;
+    margin-bottom: 4px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    transition: background 0.15s, color 0.15s;
+    margin-bottom: 2px;
+  }
+
+  .nav-item:hover {
+    background: var(--bg-card);
+    color: var(--text);
+  }
+
+  .nav-item.active {
+    background: rgba(88, 166, 255, 0.1);
+    color: var(--accent);
+  }
+
+  .nav-item.internal {
+    opacity: 0.55;
+  }
+
+  .method-badge {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 4px;
+    min-width: 34px;
+    text-align: center;
+  }
+
+  .method-badge.post {
+    background: rgba(35, 134, 54, 0.2);
+    color: var(--method-post-text);
+    border: 1px solid rgba(35, 134, 54, 0.3);
+  }
+
+  .method-badge.get {
+    background: rgba(31, 78, 140, 0.2);
+    color: var(--method-get-text);
+    border: 1px solid rgba(31, 78, 140, 0.3);
+  }
+
+  .lock-icon {
+    margin-left: auto;
+    font-size: 10px;
+    opacity: 0.5;
+  }
+
+  /* MAIN CONTENT */
+  .main {
+    flex: 1;
+    max-width: 860px;
+    padding: 48px 48px 80px;
+  }
+
+  .page-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .page-subtitle {
+    font-size: 15px;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+    line-height: 1.5;
+  }
+
+  .info-cards {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+  }
+
+  .info-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .info-card-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .info-card-value {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 13px;
+    color: var(--accent);
+    word-break: break-all;
+  }
+
+  .notice {
+    background: rgba(88, 166, 255, 0.05);
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 48px;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .notice strong {
+    color: var(--text);
+  }
+
+  /* ENDPOINT */
+  .endpoint {
+    margin-bottom: 56px;
+    scroll-margin-top: 24px;
+  }
+
+  .endpoint-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .endpoint-method {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 5px;
+  }
+
+  .endpoint-method.post {
+    background: rgba(35, 134, 54, 0.15);
+    color: var(--method-post-text);
+    border: 1px solid rgba(35, 134, 54, 0.3);
+  }
+
+  .endpoint-method.get {
+    background: rgba(31, 78, 140, 0.15);
+    color: var(--method-get-text);
+    border: 1px solid rgba(31, 78, 140, 0.3);
+  }
+
+  .endpoint-path {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .endpoint-internal-badge {
+    font-size: 11px;
+    background: rgba(240, 136, 62, 0.1);
+    border: 1px solid rgba(240, 136, 62, 0.3);
+    color: var(--orange);
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 4px;
+  }
+
+  .endpoint-desc {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 48px 0;
+  }
+
+  /* SECTION */
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+
+  /* TABLE */
+  .param-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    font-size: 13px;
+  }
+
+  .param-table th {
+    background: var(--bg-card);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .param-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .param-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .param-table tr:hover td {
+    background: rgba(255,255,255,0.02);
+  }
+
+  .param-name {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  .param-type {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 11px;
+    color: var(--purple);
+  }
+
+  .required-badge {
+    font-size: 10px;
+    background: rgba(255, 123, 114, 0.1);
+    border: 1px solid rgba(255, 123, 114, 0.25);
+    color: var(--red);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .optional-badge {
+    font-size: 10px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  /* CODE BLOCK */
+  .code-block {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .code-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .code-block-lang {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .code-block pre {
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: "SF Mono", "Fira Code", "Fira Mono", monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: #e6edf3;
+  }
+
+  .json-key { color: #79c0ff; }
+  .json-string { color: #a5d6ff; }
+  .json-bool { color: #ff7b72; }
+  .json-number { color: #f2cc60; }
+  .json-null { color: var(--text-muted); }
+  .comment { color: var(--text-dim); font-style: italic; }
+
+  /* FILE TYPES */
+  .file-types {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .file-type-tag {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 3px 10px;
+    border-radius: 4px;
+  }
+
+  /* RESPONSE TABS */
+  .response-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+
+  .response-tab {
+    padding: 8px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s;
+  }
+
+  .response-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .status-200 { color: var(--green); }
+  .status-400 { color: var(--orange); }
+  .status-500 { color: var(--red); }
+
+  /* COMING SOON */
+  .coming-soon {
+    background: var(--bg-card);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <div class="logo-icon">K</div>
+      <span class="logo-name">eco-knock AI</span>
+      <span class="logo-version">v1</span>
+    </div>
+    <div class="sidebar-base-url">eco-knock-ai.isek-ai.org</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">개요</div>
+    <a class="nav-item active" href="#overview">
+      소개
+    </a>
+
+    <div class="nav-section-label" style="margin-top:16px">엔드포인트</div>
+    <a class="nav-item" href="#health">
+      <span class="method-badge get">GET</span>
+      /health
+    </a>
+    <a class="nav-item" href="#chat">
+      <span class="method-badge post">POST</span>
+      /chat
+    </a>
+    <a class="nav-item internal" href="#retrieve">
+      <span class="method-badge post">POST</span>
+      /retrieve
+      <span class="lock-icon">🔒</span>
+    </a>
+    <a class="nav-item internal" href="#index-all">
+      <span class="method-badge post">POST</span>
+      /documents/index-all
+      <span class="lock-icon">🔒</span>
+    </a>
+
+  </nav>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <h1 class="page-title">eco-knock AI 서버</h1>
+    <p class="page-subtitle">
+      에코노베이션 동아리 챗봇 AI 서버 API 명세서입니다.<br>
+      동아리 문서 기반 RAG 챗봇으로, 텍스트 및 이미지/PDF 입력을 지원합니다.
+    </p>
+
+    <div class="info-cards">
+      <div class="info-card">
+        <div class="info-card-label">서버 주소</div>
+        <div class="info-card-value">eco-knock-ai.isek-ai.org</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">Swagger UI</div>
+        <div class="info-card-value">eco-knock-ai.isek-ai.org/docs</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-label">프로토콜</div>
+        <div class="info-card-value">HTTPS</div>
+      </div>
+    </div>
+
+    <div class="notice">
+      <strong>외부 연동 시 /chat 엔드포인트만 사용해주세요.</strong><br>
+      🔒 잠김 엔드포인트(/retrieve, /documents/index-all)는 AI 서버 내부 관리용으로,
+      외부에서 호출하지 않아도 됩니다.
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- HEALTH -->
+  <section class="endpoint" id="health">
+    <div class="endpoint-header">
+      <span class="endpoint-method get">GET</span>
+      <span class="endpoint-path">/health</span>
+    </div>
+    <p class="endpoint-desc">서버 정상 작동 여부를 확인합니다.</p>
+
+    <div class="section-title">응답 예시</div>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-lang status-200">200 OK</span>
+      </div>
+      <pre><span class="json-key">{
+  "status"</span><span>: </span><span class="json-string">"ok"</span>
+<span>}</span></pre>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- CHAT -->
+  <section class="endpoint" id="chat">
+    <div class="endpoint-header">
+      <span class="endpoint-method post">POST</span>
+      <span class="endpoint-path">/chat</span>
+    </div>
+    <p class="endpoint-desc">
+      챗봇에 질문합니다. 동아리 문서 기반으로 답변하며, 이미지 또는 PDF 파일을 함께 첨부할 수 있습니다.
+    </p>
+
+    <div class="section-title">Content-Type</div>
+    <div class="code-block" style="margin-bottom:24px">
+      <pre style="padding:12px 18px"><span class="json-string">multipart/form-data</span>  <span class="comment"># JSON이 아닌 form-data 형식</span></pre>
+    </div>
+
+    <div class="section-title">요청 파라미터</div>
+    <table class="param-table">
+      <thead>
+        <tr>
+          <th>파라미터</th>
+          <th>타입</th>
+          <th>필수</th>
+          <th>설명</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="param-name">question</span></td>
+          <td><span class="param-type">string</span></td>
+          <td><span class="required-badge">필수</span></td>
+          <td>질문 내용</td>
+        </tr>
+        <tr>
+          <td><span class="param-name">file</span></td>
+          <td><span class="param-type">file</span></td>
+          <td><span class="optional-badge">선택</span></td>
+          <td>첨부 파일 (이미지 또는 PDF)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-title">지원 파일 형식</div>
+    <div class="file-types" style="margin-bottom:24px">
+      <span class="file-type-tag">jpg</span>
+      <span class="file-type-tag">jpeg</span>
+      <span class="file-type-tag">png</span>
+      <span class="file-type-tag">webp</span>
+      <span class="file-type-tag">gif</span>
+      <span class="file-type-tag">pdf</span>
+    </div>
+
+    <div class="section-title">응답 필드</div>
+    <table class="param-table">
+      <thead>
+        <tr>
+          <th>필드</th>
+          <th>타입</th>
+          <th>설명</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="param-name">answer</span></td>
+          <td><span class="param-type">string</span></td>
+          <td>챗봇 답변 텍스트</td>
+        </tr>
+        <tr>
+          <td><span class="param-name">sources</span></td>
+          <td><span class="param-type">string[]</span></td>
+          <td>답변에 참고한 문서 경로 목록</td>
+        </tr>
+        <tr>
+          <td><span class="param-name">used_retrieval</span></td>
+          <td><span class="param-type">boolean</span></td>
+          <td>문서 검색 사용 여부 (true: 문서 기반, false: 일반 대화)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-title">응답 예시 — 문서 기반 답변</div>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-lang status-200">200 OK</span>
+      </div>
+      <pre>{
+  <span class="json-key">"answer"</span>: <span class="json-string">"AM은 Active Member의 줄임말로, 현 학기에 활동 중인 회원이에요 ✨"</span>,
+  <span class="json-key">"sources"</span>: [<span class="json-string">"data/econovation_rules.md"</span>],
+  <span class="json-key">"used_retrieval"</span>: <span class="json-bool">true</span>
+}</pre>
+    </div>
+
+    <div class="section-title">응답 예시 — 일반 대화</div>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-lang status-200">200 OK</span>
+      </div>
+      <pre>{
+  <span class="json-key">"answer"</span>: <span class="json-string">"안녕하세요! 에코노베이션 관련 질문이 있으면 뭐든 물어보세요 😊"</span>,
+  <span class="json-key">"sources"</span>: [],
+  <span class="json-key">"used_retrieval"</span>: <span class="json-bool">false</span>
+}</pre>
+    </div>
+
+    <div class="section-title">에러 응답</div>
+    <table class="param-table">
+      <thead>
+        <tr><th>상태 코드</th><th>설명</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="status-400">400</span></td>
+          <td>지원하지 않는 파일 형식</td>
+        </tr>
+        <tr>
+          <td><span class="status-500">500</span></td>
+          <td>서버 내부 오류</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider">
+
+  <!-- RETRIEVE -->
+  <section class="endpoint" id="retrieve">
+    <div class="endpoint-header">
+      <span class="endpoint-method post">POST</span>
+      <span class="endpoint-path">/retrieve</span>
+      <span class="endpoint-internal-badge">🔒 내부 관리용</span>
+    </div>
+    <p class="endpoint-desc">벡터 DB 검색 결과만 반환합니다. AI 서버 디버깅 목적으로만 사용합니다.</p>
+
+    <div class="section-title">Content-Type</div>
+    <div class="code-block" style="margin-bottom:24px">
+      <pre style="padding:12px 18px"><span class="json-string">application/json</span></pre>
+    </div>
+
+    <div class="section-title">요청 필드</div>
+    <table class="param-table">
+      <thead>
+        <tr><th>필드</th><th>타입</th><th>필수</th><th>기본값</th><th>설명</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="param-name">question</span></td>
+          <td><span class="param-type">string</span></td>
+          <td><span class="required-badge">필수</span></td>
+          <td>–</td>
+          <td>검색할 질문</td>
+        </tr>
+        <tr>
+          <td><span class="param-name">top_k</span></td>
+          <td><span class="param-type">integer</span></td>
+          <td><span class="optional-badge">선택</span></td>
+          <td><span class="param-type">3</span></td>
+          <td>반환할 검색 결과 수</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="section-title">응답 예시</div>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-lang status-200">200 OK</span>
+      </div>
+      <pre>{
+  <span class="json-key">"question"</span>: <span class="json-string">"AM 활동 조건"</span>,
+  <span class="json-key">"results"</span>: [
+    {
+      <span class="json-key">"chunk_id"</span>: <span class="json-number">7</span>,
+      <span class="json-key">"title"</span>: <span class="json-string">"제2장 회원 > 제5조 회원의 분류 > 1. AM (Active Member)"</span>,
+      <span class="json-key">"score"</span>: <span class="json-number">0.884554</span>,
+      <span class="json-key">"text"</span>: <span class="json-string">"- 현 학기에 활동하는 ..."</span>,
+      <span class="json-key">"source"</span>: <span class="json-string">"data/econovation_rules.md"</span>
+    }
+  ]
+}</pre>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- INDEX-ALL -->
+  <section class="endpoint" id="index-all">
+    <div class="endpoint-header">
+      <span class="endpoint-method post">POST</span>
+      <span class="endpoint-path">/documents/index-all</span>
+      <span class="endpoint-internal-badge">🔒 내부 관리용</span>
+    </div>
+    <p class="endpoint-desc">문서 파일들을 청킹 및 임베딩하여 벡터 DB에 인덱싱합니다.</p>
+
+    <div class="section-title">요청 예시</div>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-lang">Request Body</span>
+      </div>
+      <pre>{
+  <span class="json-key">"file_paths"</span>: [
+    <span class="json-string">"data/econovation_rules.md"</span>,
+    <span class="json-string">"data/club_intro.md"</span>,
+    <span class="json-string">"data/blog_dev.md"</span>
+  ]
+}</pre>
+    </div>
+
+    <div class="section-title">응답 예시</div>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="code-block-lang status-200">200 OK</span>
+      </div>
+      <pre>{
+  <span class="json-key">"total_files"</span>: <span class="json-number">3</span>,
+  <span class="json-key">"total_chunks"</span>: <span class="json-number">683</span>,
+  <span class="json-key">"results"</span>: [
+    { <span class="json-key">"file_path"</span>: <span class="json-string">"data/econovation_rules.md"</span>, <span class="json-key">"chunks"</span>: <span class="json-number">89</span>, <span class="json-key">"error"</span>: <span class="json-null">null</span> },
+    { <span class="json-key">"file_path"</span>: <span class="json-string">"data/club_intro.md"</span>, <span class="json-key">"chunks"</span>: <span class="json-number">12</span>, <span class="json-key">"error"</span>: <span class="json-null">null</span> },
+    { <span class="json-key">"file_path"</span>: <span class="json-string">"data/blog_dev.md"</span>, <span class="json-key">"chunks"</span>: <span class="json-number">288</span>, <span class="json-key">"error"</span>: <span class="json-null">null</span> }
+  ]
+}</pre>
+    </div>
+  </section>
+
+
+</main>
+
+</body>
+</html>
