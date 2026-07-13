@@ -21,7 +21,7 @@
 - 프롬프트 외부 파일 관리 (`core/prompts/with_context.md`, `no_context.md`, `unknown_context.md`)
 - `/chat` 이미지·PDF 파일 첨부 지원 (jpg, png, webp, gif, pdf)
 - `/chat`, `/retrieve`, `/documents/index-all` API 엔드포인트
-- 에코노베이션 블로그 크롤러 (`crawler.py`) — 카테고리별 마크다운 저장
+- 에코노베이션 블로그 크롤러 (`blog_crawler.py`) — 카테고리별 마크다운 저장
 - vectorstore 정리 스크립트 (`cleanup_vectorstore.py`) — 유효하지 않은 source 청크 삭제
 
 ## 아직 미완성인 부분
@@ -71,7 +71,7 @@ KEYRING/
 │       │   └── documents.py    # /documents/index-all 엔드포인트
 │       └── services/
 │           ├── chunker.py      # 마크다운 청킹 로직
-│           ├── crawler.py      # 에코노베이션 블로그 크롤러
+│           ├── blog_crawler.py # 에코노베이션 블로그 크롤러
 │           ├── loader.py       # 파일 로딩
 │           ├── llm.py          # Gemini 연결, RAG 함수들
 │           └── retriever.py    # 하이브리드 검색
@@ -158,7 +158,7 @@ ChatResponse(answer, sources, used_retrieval)
 >
 > ```bash
 > cd ai_server
-> python app/services/crawler.py
+> python app/services/blog_crawler.py
 > ```
 
 ```http

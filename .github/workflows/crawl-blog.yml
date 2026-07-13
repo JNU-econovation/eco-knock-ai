@@ -53,7 +53,7 @@ jobs:
 
       - name: Run crawler
         if: steps.check_change.outputs.changed == 'true'
-        run: python ai_server/app/services/crawler.py
+        run: python ai_server/app/services/blog_crawler.py
 
       - name: 크롤링 결과 및 새 해시 커밋 & 푸시
         if: steps.check_change.outputs.changed == 'true'
