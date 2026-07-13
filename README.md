@@ -20,13 +20,15 @@
 - 검색 결과 relevance threshold(0.4) 필터링 — 관련 문서 없을 때 `unknown_context` 분기
 - 프롬프트 외부 파일 관리 (`core/prompts/with_context.md`, `no_context.md`, `unknown_context.md`)
 - `/chat` 이미지·PDF 파일 첨부 지원 (jpg, png, webp, gif, pdf)
-- `/chat`, `/retrieve`, `/documents/index-all` API 엔드포인트
+- `/chat`, `/retrieve`, `/documents/index-all`, `/health`, `/api-spec` API 엔드포인트
 - 에코노베이션 블로그 크롤러 (`blog_crawler.py`) — 카테고리별 마크다운 저장
+- 노션 API 기반 문서 크롤러 (`notion_crawler.py`) — 페이지별 마크다운 저장, weekly/monthly 그룹 관리
+- GitHub Actions 자동 크롤링 (블로그: 매일 변경 감지 시, 노션: 매주/매월) — 결과 자동 커밋 및 배포 서버 재인덱싱
 - vectorstore 정리 스크립트 (`cleanup_vectorstore.py`) — 유효하지 않은 source 청크 삭제
 
 ## 아직 미완성인 부분
 
-- 문서 추가
+- 재인덱싱 후 실제 쿼리 테스트 및 정확도 검증
 - 프론트엔드 연동
 - 기타 등등
 
@@ -39,25 +41,37 @@
 - sentence-transformers (`paraphrase-multilingual-MiniLM-L12-v2`)
 - Pydantic
 - requests + BeautifulSoup4 (블로그 크롤러)
+- requests (노션 크롤러, Notion API 직접 호출)
 
 ## 프로젝트 구조
 
 ```text
 KEYRING/
-├── .env                        # GOOGLE_API_KEY 보관 (깃 제외)
+├── .env                        # GOOGLE_API_KEY, NOTION_TOKEN 보관 (깃 제외)
 ├── .gitignore
+├── .github/
+│   ├── last_blog_commit        # 블로그 원본 레포 최근 커밋 해시 (변경 감지용)
+│   └── workflows/
+│       ├── crawl-blog.yml              # 블로그 크롤링 (매일, 원본 레포 변경 시에만 실행)
+│       ├── crawl-notion-weekly.yml     # 노션 크롤링 (매주 월요일)
+│       └── crawl-notion-monthly.yml    # 노션 크롤링 (매월 1일)
 ├── ai_server/
 │   ├── data/                   # 원본 문서
 │   │   ├── econovation_rules.md
 │   │   ├── activities.md
 │   │   ├── club_intro.md
 │   │   ├── members.md          # 회원 정보
+│   │   ├── book_list.md        # 동아리방 도서 목록
+│   │   ├── project_guide.md    # 프로젝트 진행 가이드
 │   │   ├── blog_dev.md         # 크롤링 결과 (SUMMER/WINTER_DEV)
 │   │   ├── blog_news.md        # 크롤링 결과 (ECONO_NEWS)
-│   │   └── blog_etc.md         # 크롤링 결과 (기타)
+│   │   ├── blog_etc.md         # 크롤링 결과 (기타)
+│   │   └── notion_*.md         # 노션 크롤링 결과 (페이지별 1파일)
 │   ├── requirements.txt
 │   └── app/
-│       ├── main.py             # FastAPI 앱 진입점, CORS, 라우터 등록
+│       ├── main.py             # FastAPI 앱 진입점, CORS, 라우터 등록, /health, /api-spec
+│       ├── static/
+│       │   └── api-docs.html   # /api-spec 에서 서빙하는 API 문서 페이지
 │       ├── core/
 │       │   ├── aliases.json    # 약어 매핑
 │       │   └── prompts/
@@ -70,11 +84,12 @@ KEYRING/
 │       │   ├── chat.py         # /chat, /retrieve 엔드포인트
 │       │   └── documents.py    # /documents/index-all 엔드포인트
 │       └── services/
-│           ├── chunker.py      # 마크다운 청킹 로직
-│           ├── blog_crawler.py # 에코노베이션 블로그 크롤러
-│           ├── loader.py       # 파일 로딩
-│           ├── llm.py          # Gemini 연결, RAG 함수들
-│           └── retriever.py    # 하이브리드 검색
+│           ├── chunker.py        # 마크다운 청킹 로직
+│           ├── blog_crawler.py   # 에코노베이션 블로그 크롤러
+│           ├── notion_crawler.py # 노션 API 기반 문서 크롤러
+│           ├── loader.py         # 파일 로딩
+│           ├── llm.py            # Gemini 연결, RAG 함수들
+│           └── retriever.py      # 하이브리드 검색
 └── vectorstore/
     └── chroma/                 # ChromaDB 영속화 데이터
 ```
@@ -105,12 +120,16 @@ KEYRING/
 - `ALLOWED_ORIGINS`
   - CORS 허용 도메인입니다. 기본값은 `*`(전체 허용)입니다.
   - 여러 도메인은 쉼표로 구분합니다. 예: `https://app.example.com,https://admin.example.com`
+- `NOTION_TOKEN`
+  - `notion_crawler.py` 실행 시에만 필요합니다.
+  - 노션 인테그레이션 토큰이며, 크롤링 대상 페이지에 해당 인테그레이션이 연결되어 있어야 합니다.
 
 예시:
 
 ```dotenv
 GOOGLE_API_KEY=your_gemini_api_key_here
 ALLOWED_ORIGINS=https://app.example.com
+NOTION_TOKEN=your_notion_integration_token_here
 ```
 
 ## 실행 방법
@@ -154,12 +173,23 @@ ChatResponse(answer, sources, used_retrieval)
 
 챗봇 사용 전 반드시 먼저 실행해야 합니다.
 
-> **블로그 데이터 안내**: `data/blog_*.md` 파일은 git에 포함되지 않습니다. 인덱싱 전에 크롤러를 먼저 실행해 생성해야 합니다.
+> **블로그 데이터 안내**: `data/blog_*.md` 파일은 GitHub Actions(`crawl-blog.yml`)가 매일 자동 생성해 git에 커밋합니다. 로컬에서 직접 최신화하려면 크롤러를 실행하세요.
 >
 > ```bash
 > cd ai_server
 > python app/services/blog_crawler.py
 > ```
+
+> **노션 데이터 안내**: `data/notion_*.md` 파일도 GitHub Actions(`crawl-notion-weekly.yml`, `crawl-notion-monthly.yml`)가 자동 생성해 git에 커밋합니다. 로컬에서 직접 실행하려면 `notion_crawler.py`를 사용하며, `NOTION_TOKEN` 환경변수가 필요합니다.
+>
+> ```bash
+> cd ai_server
+> python app/services/notion_crawler.py            # 전체 페이지
+> python app/services/notion_crawler.py --group weekly   # 멘토링, Econovation
+> python app/services/notion_crawler.py --group monthly  # Contributors, 동아리방 대청소, 알림아리, 여름 야유회
+> ```
+>
+> GitHub Actions가 각각 매일(블로그, 변경 시에만)/매주 월요일/매월 1일 자동 실행하고 결과를 커밋한 뒤 배포 서버를 재인덱싱합니다.
 
 ```http
 POST /documents/index-all
@@ -170,10 +200,18 @@ Content-Type: application/json
     "data/econovation_rules.md",
     "data/activities.md",
     "data/club_intro.md",
+    "data/members.md",
+    "data/book_list.md",
+    "data/project_guide.md",
     "data/blog_dev.md",
     "data/blog_news.md",
     "data/blog_etc.md",
-    "data/members.md"
+    "data/notion_멘토링.md",
+    "data/notion_econovation.md",
+    "data/notion_contributors.md",
+    "data/notion_동아리방_대청소.md",
+    "data/notion_알림아리.md",
+    "data/notion_여름_야유회.md"
   ]
 }
 ```
@@ -243,6 +281,24 @@ Content-Type: application/json
 ```
 
 `top_k`의 기본값은 `3`입니다.
+
+## 상태 확인 및 API 문서 페이지
+
+```http
+GET /health
+```
+
+```json
+{ "status": "ok" }
+```
+
+```http
+GET /api-spec
+```
+
+`static/api-docs.html`을 HTML로 렌더링해 반환합니다. API 엔드포인트를 브라우저에서 확인할 때 사용합니다.
+
+배포 서버 API 문서: https://eco-knock-ai.isek-ai.org/api-spec
 
 ## 현재 상태 요약
 
