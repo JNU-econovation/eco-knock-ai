@@ -1,3 +1,4 @@
+import argparse
 import os
 import time
 from pathlib import Path
@@ -17,13 +18,16 @@ MAX_DEPTH = 6
 NON_NESTING_TYPES = {"column_list", "column"}
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
-PAGE_IDS = [
-    "1a830b4e-356c-8064-979d-e6134d50583d",
-    "1be30b4e-356c-801d-9da4-ea0abc4cf701",
-    "25730b4e-356c-8003-abf9-e21b6ee66f40",
-    "19f30b4e-356c-80c5-8416-e2aad3c7785c",
-    "25330b4e-356c-806e-baf9-f39c0de10ec2",
-    "13e30b4e-356c-8033-96e3-f252d6d322c8",
+WEEKLY_PAGE_IDS = [
+    "1a830b4e-356c-8064-979d-e6134d50583d",  # 멘토링
+    "13e30b4e-356c-8033-96e3-f252d6d322c8",  # Econovation
+]
+
+MONTHLY_PAGE_IDS = [
+    "1be30b4e-356c-801d-9da4-ea0abc4cf701",  # Contributors
+    "25730b4e-356c-8003-abf9-e21b6ee66f40",  # 동아리방 대청소
+    "19f30b4e-356c-80c5-8416-e2aad3c7785c",  # 알림아리
+    "25330b4e-356c-806e-baf9-f39c0de10ec2",  # 여름 야유회
 ]
 
 TEXT_BLOCK_TYPES = {
@@ -291,13 +295,13 @@ def _slugify_title(title: str) -> str:
     return title.strip().lower().replace(" ", "_").replace("/", "_")
 
 
-def crawl_notion() -> int:
+def crawl_notion(page_ids: list[str]) -> int:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     total_start = time.monotonic()
 
-    for i, page_id in enumerate(PAGE_IDS, 1):
-        print(f"[{i}/{len(PAGE_IDS)}] {page_id}")
+    for i, page_id in enumerate(page_ids, 1):
+        print(f"[{i}/{len(page_ids)}] {page_id}")
         page_start = time.monotonic()
 
         title = _get_page_title(page_id)
@@ -313,9 +317,20 @@ def crawl_notion() -> int:
         print(f"저장 완료: {output_path} ({page_elapsed:.1f}초)")
 
     total_elapsed = time.monotonic() - total_start
-    print(f"크롤링 완료. 총 {len(PAGE_IDS)}개 페이지 저장. 총 소요시간: {total_elapsed:.1f}초 ({total_elapsed / 60:.1f}분)")
-    return len(PAGE_IDS)
+    print(f"크롤링 완료. 총 {len(page_ids)}개 페이지 저장. 총 소요시간: {total_elapsed:.1f}초 ({total_elapsed / 60:.1f}분)")
+    return len(page_ids)
 
 
 if __name__ == "__main__":
-    crawl_notion()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--group", choices=["weekly", "monthly"], default=None)
+    args = parser.parse_args()
+
+    if args.group == "weekly":
+        target_page_ids = WEEKLY_PAGE_IDS
+    elif args.group == "monthly":
+        target_page_ids = MONTHLY_PAGE_IDS
+    else:
+        target_page_ids = WEEKLY_PAGE_IDS + MONTHLY_PAGE_IDS
+
+    crawl_notion(target_page_ids)
