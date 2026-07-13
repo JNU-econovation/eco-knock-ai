@@ -1,0 +1,56 @@
+name: Notion Monthly Crawl
+
+on:
+  schedule:
+    - cron: "0 15 1 * *"  # 매월 1일 KST 자정 (UTC 15:00)
+  workflow_dispatch:
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r ai_server/requirements.txt
+
+      - name: Run crawler
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: python ai_server/app/services/notion_crawler.py --group monthly
+
+      - name: 크롤링 결과 커밋 & 푸시
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ai_server/data/notion_*.md
+          if git diff --cached --quiet; then
+            echo "변경사항 없음, 커밋 생략"
+          else
+            git commit -m "🔧 chore: 노션 크롤링 데이터 자동 업데이트 (monthly)"
+            git push
+          fi
+
+      - name: 배포 서버 재인덱싱
+        run: |
+          curl -X POST "https://eco-knock-ai.isek-ai.org/documents/index-all" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "file_paths": [
+                "data/notion_contributors.md",
+                "data/notion_동아리방_대청소.md",
+                "data/notion_알림아리.md",
+                "data/notion_여름_야유회.md"
+              ]
+            }'
