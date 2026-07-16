@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from app.routes.chat import router as chat_router
 from app.routes.documents import router as documents_router
+from app.routes.slack import router as slack_router
 
 app = FastAPI(title="club ai server")
 
@@ -21,6 +22,7 @@ app.add_middleware(
 
 app.include_router(documents_router)
 app.include_router(chat_router)
+app.include_router(slack_router)
 
 @app.get("/")
 def root():
