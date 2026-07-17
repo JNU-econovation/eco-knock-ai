@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Dict
+import hashlib
 import json
 import re
 import chromadb
@@ -161,6 +162,44 @@ class HybridRetriever:
         ).tolist()
 
         self.collection.add(
+            ids=ids,
+            documents=documents,
+            metadatas=metadatas,
+            embeddings=embeddings,
+        )
+
+        return len(chunks)
+
+    def add_chunks(self, chunks: List[Dict]) -> int:
+        if not chunks:
+            return 0
+
+        ids = []
+        for chunk in chunks:
+            digest = hashlib.sha256(f'{chunk["title"]}\n{chunk["text"]}'.encode()).hexdigest()[:16]
+            ids.append(f"{chunk['source']}::{digest}")
+
+        documents = [chunk["text"] for chunk in chunks]
+        metadatas = [
+            {
+                "chunk_id": int(chunk["chunk_id"]),
+                "title": str(chunk["title"]),
+                "source": str(chunk["source"]),
+            }
+            for chunk in chunks
+        ]
+        embedding_inputs = [
+            f'{chunk["title"]}\n{chunk["text"]}'.strip()
+            for chunk in chunks
+        ]
+
+        embeddings = self.model.encode(
+            embedding_inputs,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+        ).tolist()
+
+        self.collection.upsert(
             ids=ids,
             documents=documents,
             metadatas=metadatas,
