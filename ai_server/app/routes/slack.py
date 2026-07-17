@@ -3,15 +3,24 @@ import hmac
 import json
 import os
 import time
+from pathlib import Path
 from urllib.parse import parse_qs
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
+
+from app.services.chunker import chunk_markdown_text
+from app.services.loader import load_document
+from app.services.retriever import retriever
 
 router = APIRouter(tags=["slack"])
 
 SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET", "")
 SIGNATURE_TOLERANCE_SECONDS = 60 * 5
+
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+SLACK_NOTICES_FILE = DATA_DIR / "slack_notices.md"
+SLACK_NOTICES_SOURCE = "data/slack_notices.md"
 
 
 def _verify_slack_signature(body: bytes, timestamp: str, signature: str) -> bool:
@@ -42,8 +51,22 @@ def _parse_body(raw_body: bytes, content_type: str) -> dict:
         return {}
 
 
+def _append_notice_and_reindex(text: str, ts: str) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(SLACK_NOTICES_FILE, "a", encoding="utf-8") as f:
+        f.write(f"\n## 공지 ({ts})\n{text}\n")
+
+    try:
+        doc_text = load_document(str(SLACK_NOTICES_FILE))
+        chunks = chunk_markdown_text(text=doc_text, source=SLACK_NOTICES_SOURCE)
+        if chunks:
+            retriever.build_index(chunks, source=SLACK_NOTICES_SOURCE)
+    except Exception as e:
+        print(f"슬랙 공지 재인덱싱 실패: {e}")
+
+
 @router.post("/slack/events")
-async def slack_events(request: Request):
+async def slack_events(request: Request, background_tasks: BackgroundTasks):
     raw_body = await request.body()
 
     timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
@@ -56,5 +79,18 @@ async def slack_events(request: Request):
 
     if body.get("type") == "url_verification":
         return PlainTextResponse(content=body.get("challenge", ""))
+
+    # Slack은 3초 내 응답이 없으면 같은 이벤트를 재전송함 — 중복 처리를 막기 위해 재시도는 무시
+    if request.headers.get("X-Slack-Retry-Num"):
+        return JSONResponse({"ok": True})
+
+    event = body.get("event", {})
+
+    if event.get("type") == "message" and not event.get("bot_id") and not event.get("subtype"):
+        text = event.get("text", "").strip()
+        ts = event.get("ts", "")
+        if text:
+            # 파일 쓰기 + 재인덱싱은 무거운 작업이라 응답 이후 백그라운드에서 처리
+            background_tasks.add_task(_append_notice_and_reindex, text, ts)
 
     return JSONResponse({"ok": True})
