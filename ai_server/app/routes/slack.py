@@ -3,6 +3,7 @@ import hmac
 import json
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -56,7 +57,13 @@ def _append_notice_and_index(text: str, ts: str) -> None:
         f.write(f"\n## 공지 ({ts})\n{text}\n")
 
     try:
-        chunk_text = f"## 공지 ({ts})\n{text}"
+        try:
+            posted_at = datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d")
+        except ValueError:
+            posted_at = ts
+
+        first_line = text.strip().splitlines()[0][:50]
+        chunk_text = f"## 슬랙 공지 ({posted_at}) - {first_line}\n{text}"
         chunks = chunk_markdown_text(text=chunk_text, source=SLACK_NOTICES_SOURCE)
         retriever.add_chunks(chunks)
     except Exception as e:
