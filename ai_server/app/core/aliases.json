@@ -2,6 +2,6 @@
   "AM": ["AM", "Active Member", "활동회원", "현재 활동 회원"],
   "CM": ["CM", "Complete Member", "수료회원", "완료회원"],
   "RM": ["RM", "Rest Member", "휴회원", "휴식회원"],
-  "DEV": ["DEV", "개발 성과 공유회", "성과 공유회"],
+  "DEV": ["DEV", "데브", "개발 성과 공유회", "성과 공유회"],
   "TF": ["TF", "Task Force", "태스크포스"]
 }

@@ -258,8 +258,7 @@ class HybridRetriever:
 
         all_data = self.collection.get(include=["documents", "metadatas"])
 
-        results = []
-        seen = set()
+        scored: Dict[str, Dict] = {}
 
         for keyword in keywords:
             if len(keyword) < 2:
@@ -267,21 +266,27 @@ class HybridRetriever:
             keyword_lower = keyword.lower()
 
             for doc, meta in zip(all_data["documents"], all_data["metadatas"]):
-                if keyword_lower not in doc.lower() and keyword_lower not in meta["title"].lower():
+                title_lower = meta["title"].lower()
+
+                if keyword_lower in title_lower:
+                    bonus = 0.1
+                elif keyword_lower in doc.lower():
+                    bonus = 0.05
+                else:
                     continue
 
                 uid = f"{meta['source']}::{meta['chunk_id']}"
-                if uid in seen:
-                    continue
-                seen.add(uid)
+                if uid not in scored:
+                    scored[uid] = {
+                        "chunk_id": int(meta["chunk_id"]),
+                        "title": meta["title"],
+                        "score": 0.8,
+                        "text": doc,
+                        "source": meta["source"],
+                    }
+                scored[uid]["score"] = min(scored[uid]["score"] + bonus, 1.0)
 
-                results.append({
-                    "chunk_id": int(meta["chunk_id"]),
-                    "title": meta["title"],
-                    "score": 0.8,
-                    "text": doc,
-                    "source": meta["source"],
-                })
+        results = sorted(scored.values(), key=lambda x: x["score"], reverse=True)
 
         return results[:top_k]
 

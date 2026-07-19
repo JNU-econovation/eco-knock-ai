@@ -58,7 +58,13 @@ async def needs_retrieval(query: str) -> bool:
 async def rewrite_query(query: str) -> str:
     prompt = (
         "동아리 문서 벡터 검색에 최적화된 쿼리로 재작성해.\n"
-        "약어(AM, CM, RM, DEV, TF 등)는 풀어쓰고, 핵심 키워드를 포함시켜.\n"
+        "아래 약어 정의를 참고해서 풀어쓰고, 핵심 키워드를 포함시켜.\n\n"
+        "약어 정의:\n"
+        "- AM = Active Member (활동회원)\n"
+        "- CM = Complete Member (수료회원)\n"
+        "- RM = Rest Member (휴회원)\n"
+        "- TF = Task Force (태스크포스)\n"
+        "- DEV, 데브 = 에코노베이션 학기말 프로젝트 발표회(성과 공유회). '개발'로 번역하지 말 것\n\n"
         "재작성된 쿼리 한 줄만 출력해. 설명 없이.\n\n"
         f"질문: {query}"
     )
