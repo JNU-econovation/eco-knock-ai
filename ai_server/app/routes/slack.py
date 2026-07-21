@@ -23,6 +23,21 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 SLACK_NOTICES_FILE = DATA_DIR / "slack_notices.md"
 SLACK_NOTICES_SOURCE = "data/slack_notices.md"
 
+_LEADING_MENTION = re.compile(r"^\s*<[^>]+>\s*")
+
+
+def _first_line_without_mentions(text: str) -> str:
+    remaining = text.strip()
+
+    while True:
+        stripped = _LEADING_MENTION.sub("", remaining)
+        if stripped == remaining:
+            break
+        remaining = stripped.strip()
+
+    first_line = remaining.splitlines()[0].strip() if remaining else ""
+    return first_line[:50] if first_line else text.strip()[:50]
+
 
 def _verify_slack_signature(body: bytes, timestamp: str, signature: str) -> bool:
     if not timestamp or not signature:
@@ -58,7 +73,7 @@ def _reindex_notice(text: str, ts: str) -> None:
     except ValueError:
         posted_at = ts
 
-    first_line = text.strip().splitlines()[0][:50]
+    first_line = _first_line_without_mentions(text)
     chunk_text = f"## 슬랙 공지 ({posted_at}) - {first_line}\n{text}"
     chunks = chunk_markdown_text(text=chunk_text, source=SLACK_NOTICES_SOURCE)
     retriever.add_chunks(chunks, extra_metadata={"slack_ts": ts})
