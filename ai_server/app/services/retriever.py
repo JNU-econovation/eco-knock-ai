@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 import hashlib
 import json
 import re
@@ -170,7 +170,7 @@ class HybridRetriever:
 
         return len(chunks)
 
-    def add_chunks(self, chunks: List[Dict]) -> int:
+    def add_chunks(self, chunks: List[Dict], extra_metadata: Optional[Dict] = None) -> int:
         if not chunks:
             return 0
 
@@ -180,14 +180,17 @@ class HybridRetriever:
             ids.append(f"{chunk['source']}::{digest}")
 
         documents = [chunk["text"] for chunk in chunks]
-        metadatas = [
-            {
+        metadatas = []
+        for chunk in chunks:
+            metadata = {
                 "chunk_id": int(chunk["chunk_id"]),
                 "title": str(chunk["title"]),
                 "source": str(chunk["source"]),
             }
-            for chunk in chunks
-        ]
+            if extra_metadata:
+                metadata.update(extra_metadata)
+            metadatas.append(metadata)
+
         embedding_inputs = [
             f'{chunk["title"]}\n{chunk["text"]}'.strip()
             for chunk in chunks
@@ -207,6 +210,12 @@ class HybridRetriever:
         )
 
         return len(chunks)
+
+    def delete_chunks(self, where: Dict) -> None:
+        try:
+            self.collection.delete(where=where)
+        except Exception:
+            pass
 
     def search(self, query: str, top_k: int = 3) -> List[Dict]:
         if not self.is_ready():
